@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en-gb">
+    <head>
+        <title>IP Checker</title>
+        <meta name="description" content="Check the response codes of IP addresses.">
+        <meta name="author" content="Joshua Kelley">
+        <meta name='viewport' content='initial-scale=1, viewport-fit=cover'>
+        <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <meta charset="utf-8">
+        
+        <script>
+            // Global variables
+            var ipArray = [];
+            var ipIndex = 0;
+            
+            // Sends IPs, passphrases, and CDN
+            function submitIPs() {
+                
+            	// Read and trim textarea
+            	var stringVal = document.getElementById("ipInput").value;
+            	stringVal = stringVal.trim();
+                
+            	// Split into array, removing empties
+            	ipArray = stringVal.split('\n');
+            	ipArray = ipArray.filter(v => v !== "");
+                
+            	// Read passphrases
+            	var sendPass1 = document.getElementById("passInput").value;
+            	var sendPass2 = document.getElementById("passInput2").value;
+                
+            	// Read CDN
+            	var cdn = "bi";
+            	if (document.getElementById('btnAk').checked) {
+            		cdn = "ak";
+            	} else if (document.getElementById('btnLl').checked) {
+            		cdn = "ll"
+            	}
+                
+            	// Bundle into JSON
+            	sendData = {
+            		"ip": ipArray[ipIndex],
+            		"pass1": sendPass1,
+            		"pass2": sendPass2,
+            		"cdn": cdn
+            	}
+                
+            	// Stringify and send
+            	sendData = JSON.stringify(sendData);
+            	xhrpost("/post", sendData)
+            }
+
+            // Submit event handler
+            function btnPress() {
+                
+                // Wipe the table, and start (again)
+            	clearTable();
+            	ipIndex = 0;
+            	submitIPs();
+            }
+            
+            // POST request
+            function xhrpost(url, data) {
+            	let xhttp = new XMLHttpRequest();
+            	xhttp.open("POST", url, true);
+            	xhttp.setRequestHeader("Content-Type", "application/json");
+            	xhttp.onreadystatechange = function() {
+            		if (xhttp.readyState == XMLHttpRequest.DONE) {
+            			postHandle(xhttp.responseText);
+            		}
+            	}
+            	xhttp.send(data);
+            }
+
+            // Handles POST response
+            function postHandle(response) {
+                
+                // Shorted response to int if code and not msg
+                response = (isNaN(parseInt(response))) ? response : parseInt(response);
+                
+                // Shorthand assigning
+            	var table = document.getElementById("responseTable");
+            	var tablerow = table.getElementsByTagName('tr')[ipIndex + 1];
+                
+                // Cell values to fill
+                var tableObj = {}
+                tableObj.img = "none";
+                tableObj.msg = "";
+                tableObj.col = "";
+                
+                switch(response) {
+                    case 200:
+                        tableObj.img = "templateCheck";
+                        tableObj.msg = "200";
+                        tableObj.col = "lime";
+                        break;
+                    case 404:
+                        tableObj.img = "templateCheck";
+                        tableObj.msg = "404";
+                        tableObj.col = "lime";
+                        break;
+                    case 403:
+                        tableObj.img = "templateCross";
+                        tableObj.msg = "403";
+                        tableObj.col = "firebrick";
+                        break;
+                    case "authErr":
+                        tableObj.img = "templateSlash";
+                        tableObj.msg = "Authentication error";
+                        tableObj.col = "indigo";
+                        break;
+                    case "timeoutErr":
+                        tableObj.img = "templateDash";
+                        tableObj.msg = "Timed out";
+                        tableObj.col = "royalblue";
+                        break;
+                    case "ipErr":
+                        tableObj.img = "templateQuestion";
+                        tableObj.msg = "Invalid IP";
+                        tableObj.col = "burlywood";
+                        break;
+                    case "phraseErr":
+                        tableObj.img = "templateExclamation";
+                        tableObj.msg = "Incorrect passphrase";
+                        tableObj.col = "orange";
+                        break;
+                    case "localErr":
+                        tableObj.msg = "🤡"
+                        break;
+                }
+                                
+                // Create new elements for DOM
+            	var newRow = document.createElement("tr");
+            	var ipCell = document.createElement("td")
+            	ipCell.appendChild(document.createTextNode(ipArray[ipIndex]));
+            	newRow.appendChild(ipCell);
+            	var biCell = document.createElement("td")
+                
+
+                // If an image is requsted, handle it
+            	if (tableObj.img != "none") {
+            		svgify(biCell, tableObj.img);
+            	}
+                
+                // Append to DOM
+            	biCell.appendChild(document.createTextNode(tableObj.msg));
+                biCell.style.color = tableObj.col;
+            	newRow.appendChild(biCell);
+            	table.appendChild(newRow)
+                
+                // Begin next IP check
+            	ipIndex++;
+            	if (ipIndex < ipArray.length) {
+            		submitIPs();
+            	}
+            }
+
+            // Runs onload
+            function onloadfunc() {
+                
+                // Check if submit should be gray
+                graybutton();
+                
+                // Get saved passphrases (if any)
+            	document.getElementById("btnPass").checked = localStorage.getItem("checkedBox");
+            	document.getElementById("passInput").value = localStorage.getItem("passPhrase1");
+            	document.getElementById("passInput2").value = localStorage.getItem("passPhrase2");
+            }
+
+            // Calls when clicking checkbox or typing password
+            function checkbox() {
+                
+                // Read passphrase values
+            	var passphrase1 = document.getElementById("passInput").value;
+            	var passphrase2 = document.getElementById("passInput2").value;
+                
+                // Save to localStorage if checked
+            	if (document.getElementById('btnPass').checked) {
+            		localStorage.setItem("passPhrase1", passphrase1);
+            		localStorage.setItem("passPhrase2", passphrase2);
+            		localStorage.setItem("checkedBox", true);
+            	} else {
+                    
+                // Delete from localStorage otherwise
+            		localStorage.removeItem("passPhrase1");
+            		localStorage.removeItem("passPhrase2");
+            		localStorage.removeItem("checkedBox");
+            	}
+            }
+
+            // Deletes the table and rebuilds the first row
+            function clearTable() {
+            	var table = document.getElementById("responseTable");
+            	table.innerHTML = "";
+            	var newRow = document.createElement("tr");
+            	var head1 = document.createElement("th");
+            	head1.appendChild(document.createTextNode("IP"));
+            	newRow.appendChild(head1);
+            	var head2 = document.createElement("th");
+            	head2.appendChild(document.createTextNode("Response"));
+            	newRow.appendChild(head2);
+            	table.appendChild(newRow);
+            }
+
+            // Appends an SVG to an element using an HTML template
+            function svgify(applyElement, icon) {
+            	var temp = document.getElementById(icon);
+            	var clon = temp.content.cloneNode(true);
+            	applyElement.appendChild(clon);
+            }
+            
+            // Check if submit button should be disabled
+            function graybutton() {
+                var iptext = document.getElementById("ipInput").value;
+                var button = document.getElementById("submitBtn");
+                
+                // Set disabled / enabled
+                if (iptext == "") {
+                    button.disabled = true;
+                } else {
+                    button.disabled = false;
+                }
+            }
+        </script>
+        
+        <style>
+            * {
+                padding: 0;
+                margin: 0;
+                font-family: "Quicksand";
+            }
+            
+            body {
+                overflow-x: hidden;
+            }
+            
+            h1 {
+                text-align: center;
+                margin-top: 20vh;
+                font-size: 3em;
+            }
+            
+            
+            #passInput, #passInput2 {
+                position: relative;
+
+                appearance: none;
+                font-size: 1rem;
+                padding: 0.5rem;
+                border-radius: 10px;
+                border: 1px solid;
+                border-color: black;
+                margin-top: 0.5rem;
+                display: inline-block;
+                width: 12.5rem;
+            }
+            
+            #passInputs {
+                position: relative;
+                text-align: center;
+            }
+            
+            #inputDiv {
+                background-color: gray;
+                max-width: 20rem;
+                width: 15rem;
+                min-height: 8rem;
+                height: calc(auto - 1px);
+                position: relative;
+                left: 50%;
+                transform: translate(-50%, 0);
+                margin-top: 1rem;
+                border-radius: 10px;
+                overflow: auto;
+                overflow-x: hidden;
+                border: 1px solid black;
+            }
+            
+            
+            #ipInput {
+                min-height: calc(8rem + 2px);
+                height: 100%;
+                width: 7.5rem;
+                float: left;
+                resize: vertical;
+                padding: 0.25rem 0.5rem 0.25rem 0.5rem;
+                box-sizing: border-box;
+                font-size: 1rem;
+                border: none;
+                border-right: 1px solid black;
+            }
+            
+            #ipInput:focus, #passInput:focus, #passInput2:focus {
+                outline: none;
+            }
+            
+
+            
+            #buttonContainer {
+                overflow: hidden;
+                border-radius: 10px;
+                float: right;
+                width: calc(100% - 7.5rem);
+                text-align: center;
+                position: absolute;
+                right: 0;
+                bottom: 0.5rem;
+            }
+            
+            #submitBtn {
+                padding: 0.25rem 0.5rem 0.25rem 0.5rem;
+                position: relative;
+            }
+            
+            
+            table {
+                margin-top: 1rem;
+                background-color: gray;
+                position: relative;
+                border-radius: 10px;
+                border: 1px solid black;
+                left: 50%;
+                transform: translate(-50%, 0);
+                margin-bottom: 1rem;
+                min-width: 15rem;
+            }
+            
+            td, th {
+                padding: 0 0.5rem 0 0.5rem;
+                text-align: left;
+            }
+            
+            p {
+                display: none;
+            }
+            
+            #cdnSelect {
+                position: relative;
+                left: 0.5rem;
+                width: calc(100% - 7.5rem);
+                float: right;
+            }
+            
+            #passBtnCheck {
+                position: relative;
+                margin-top: -1rem;
+                margin-bottom: -0.5rem;
+                text-align: center;
+                font-size: 1rem;
+                transform: scale(0.8);
+            }
+            
+            button {
+                cursor: pointer;
+            }
+            
+            button:disabled {
+                cursor: not-allowed;
+            }
+            
+            legend {
+                margin-top: 0.25rem;
+            }
+            
+            .bootstrapSVG {
+                width: 1em;
+                height: 1em;
+                position: relative;
+                top: 0.16em;
+            }
+            
+
+            
+            
+
+            
+            
+            
+            
+            @media (prefers-color-scheme: dark) {
+                body {
+                    background-color: #191919;
+                    color: white;
+                }
+                #passInput, #passInput2 {
+                    background-color: #111111;
+                    border-color: white;
+                    color: white;
+                }
+                #inputDiv {
+                    background-color: #111111;
+                    border: 1px solid white;
+                    color: white;
+                }
+                table {
+                    background-color: #111111;
+                    border: 1px solid white;
+                    color: white;
+                }
+                #ipInput {
+                    background-color: #151515;
+                    border-right: 1px solid white;
+                    color: white;
+                }
+            }
+            
+        </style>
+    </head>
+    <body onload="onloadfunc()">
+        <h1>IP Checker</h1>
+        <div id="passInputs">
+            <input type="password" id="passInput" placeholder="Passphrase (nas_expat)" oninput="checkbox()">
+            <input type="password" id="passInput2" placeholder="Passphrase (expat_rsa)" oninput="checkbox()">
+        </div>
+        <br>
+        <div id="passBtnCheck">
+            <input type="checkbox" id="btnPass" onclick="checkbox()">
+            <label for="btnPass">Remember passphrases</label><br>
+        </div>
+        <div id="inputDiv">
+            <textarea id="ipInput" placeholder="Enter IPs" oninput='this.style.height = "";this.style.height = this.scrollHeight + "px"; graybutton()'></textarea>
+            <div id="cdnSelect">
+                <legend><b>CDN</b></legend>
+                <input type="radio" id="btnBi" name="cdnbtn" checked="checked">
+                <label for="btnBi">BIDI</label><br>
+                <input type="radio" id="btnLl" name="cdnbtn">
+                <label for="btnLl">LimeLight</label><br>
+                <input type="radio" id="btnAk" name="cdnbtn">
+                <label for="btnAk">Akamai</label>
+            </div>
+            <div id="buttonContainer">
+                <button id="submitBtn" onclick="btnPress()" disabled>Submit</button>
+            </div>
+            
+        </div>
+        <table id="responseTable">
+            <tr>
+                <th>IP</th>
+                <th>Response</th>
+            </tr>
+        </table>
+        <!--Images provided by Bootstrap Icons-->
+        <template id="templateCheck">
+            <svg viewBox="0 0 16 16" class="bootstrapSVG" fill="lime">
+                <path fill-rule="evenodd" d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+            </svg>
+        </template>
+        <template id="templateCross">
+            <svg viewBox="0 0 16 16" class="bootstrapSVG" fill="firebrick">
+                <path fill-rule="evenodd" d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-4.146-3.146a.5.5 0 0 0-.708-.708L8 7.293 4.854 4.146a.5.5 0 1 0-.708.708L7.293 8l-3.147 3.146a.5.5 0 0 0 .708.708L8 8.707l3.146 3.147a.5.5 0 0 0 .708-.708L8.707 8l3.147-3.146z"/>
+            </svg>
+        </template>
+        <template id="templateQuestion">
+            <svg viewBox="0 0 16 16" class="bootstrapSVG" fill="burlywood">
+                <path fill-rule="evenodd" d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.496 6.033a.237.237 0 0 1-.24-.247C5.35 4.091 6.737 3.5 8.005 3.5c1.396 0 2.672.73 2.672 2.24 0 1.08-.635 1.594-1.244 2.057-.737.559-1.01.768-1.01 1.486v.105a.25.25 0 0 1-.25.25h-.81a.25.25 0 0 1-.25-.246l-.004-.217c-.038-.927.495-1.498 1.168-1.987.59-.444.965-.736.965-1.371 0-.825-.628-1.168-1.314-1.168-.803 0-1.253.478-1.342 1.134-.018.137-.128.25-.266.25h-.825zm2.325 6.443c-.584 0-1.009-.394-1.009-.927 0-.552.425-.94 1.01-.94.609 0 1.028.388 1.028.94 0 .533-.42.927-1.029.927z"/>
+            </svg>
+        </template>
+        <template id="templateExclamation">
+            <svg viewBox="0 0 16 16" class="bootstrapSVG" fill="orange">
+                <path fill-rule="evenodd" d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
+            </svg>
+        </template>
+        <template id="templateSlash">
+            <svg viewBox="0 0 16 16" class="bootstrapSVG" fill="purple">
+                <path fill-rule="evenodd" d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-4.646-2.646a.5.5 0 0 0-.708-.708l-6 6a.5.5 0 0 0 .708.708l6-6z"/>
+            </svg>
+        </template>
+        <template id="templateDash">
+            <svg viewBox="0 0 16 16" class="bootstrapSVG" fill="royalblue">
+                <path fill-rule="evenodd" d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM4.5 7.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7z"/>
+            </svg>
+        </template>
+    </body>
+</html>
